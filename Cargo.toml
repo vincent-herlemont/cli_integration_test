@@ -1,0 +1,14 @@
+[package]
+name = "cli_integration_test"
+version = "0.1.0"
+authors = ["Vincent Herlemont <vincentherl@leszeros.com>"]
+edition = "2018"
+
+[dependencies]
+fs_extra = "1.1.0"
+walkdir = "2.3.1"
+tempdir = "0.3.7"
+assert_cmd = "1.0.1"
+
+[dev-dependencies]
+predicates = "1.0.4"

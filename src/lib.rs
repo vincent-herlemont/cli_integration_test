@@ -75,8 +75,7 @@ impl IntegrationTestEnvironment {
     }
 
     pub fn set_exec_permission<P:AsRef<Path>>(&self,file: P) -> io::Result<()> {
-        let file = file.as_ref().canonicalize()?;
-        let file = self.tmp_dir.path().join(file);
+        let file = self.tmp_dir.path().join(file.as_ref());
         let permissions = Permissions::from_mode(0o755);
         set_permissions(file, permissions)?;
         Ok(())
@@ -134,7 +133,7 @@ mod test {
         e.add_file("dir/file2", "test 2");
         e.add_dir("emptry_dir");
         e.setup();
-        e.set_exec_permission("dir/file2");
+        e.set_exec_permission("dir/file2").unwrap();
         let display = e.to_string();
         assert!(contains("file1").eval(display.as_str()));
         assert!(contains("dir/file2").eval(display.as_str()));

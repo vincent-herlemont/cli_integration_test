@@ -7,6 +7,9 @@ use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use tempdir::TempDir;
 use walkdir::WalkDir;
+use std::os::unix::fs::PermissionsExt;
+use std::fs::{set_permissions, Permissions};
+use std::io;
 
 #[derive(Debug)]
 pub struct IntegrationTestEnvironment {
@@ -71,6 +74,14 @@ impl IntegrationTestEnvironment {
         }
     }
 
+    pub fn set_exec_permission<P:AsRef<Path>>(&self,file: P) -> io::Result<()> {
+        let file = file.as_ref().canonicalize()?;
+        let file = self.tmp_dir.path().join(file);
+        let permissions = Permissions::from_mode(0o755);
+        set_permissions(file, permissions)?;
+        Ok(())
+    }
+
     pub fn tree(&self) -> Vec<PathBuf> {
         let mut tree: Vec<PathBuf> = WalkDir::new(self.tmp_dir.path())
             .into_iter()
@@ -123,6 +134,7 @@ mod test {
         e.add_file("dir/file2", "test 2");
         e.add_dir("emptry_dir");
         e.setup();
+        e.set_exec_permission("dir/file2");
         let display = e.to_string();
         assert!(contains("file1").eval(display.as_str()));
         assert!(contains("dir/file2").eval(display.as_str()));

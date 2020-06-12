@@ -11,11 +11,11 @@ use std::os::unix::fs::PermissionsExt;
 use std::fs::{set_permissions, Permissions};
 use std::io;
 
-#[derive(Debug)]
 pub struct IntegrationTestEnvironment {
     label: String,
     tmp_dir: TempDir,
     entries: HashMap<PathBuf, Option<String>>,
+    cfg_command_callback: Box<dyn Fn(PathBuf,Command) -> Command>,
 }
 
 impl IntegrationTestEnvironment {
@@ -29,7 +29,12 @@ impl IntegrationTestEnvironment {
             label,
             tmp_dir,
             entries: HashMap::new(),
+            cfg_command_callback: Box::new(|_,c|c),
         }
+    }
+
+    pub fn set_cfg_command_callback(&mut self, callback: impl Fn(PathBuf,Command) -> Command + 'static) {
+        self.cfg_command_callback = Box::new(callback);
     }
 
     pub fn add_file<P, C>(&mut self, path: P, content: C)
@@ -103,7 +108,7 @@ impl IntegrationTestEnvironment {
     {
         let mut command = Command::cargo_bin(crate_name).unwrap();
         command.current_dir(&self.tmp_dir.path());
-        command
+        (self.cfg_command_callback)(self.path().clone().to_path_buf(),command)
     }
 
     pub fn path(&self) -> &Path {

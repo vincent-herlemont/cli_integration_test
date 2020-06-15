@@ -60,6 +60,11 @@ impl IntegrationTestEnvironment {
         read_to_string(&path).expect(format!("fail to read file {:?}", path).as_str())
     }
 
+    pub fn exist_file<P: AsRef<Path>>(&self, path: P) -> bool {
+        let path = self.tmp_dir.path().join(path.as_ref());
+        path.exists()
+    }
+
     pub fn add_dir<P>(&mut self, path: P)
     where
         P: AsRef<Path>,

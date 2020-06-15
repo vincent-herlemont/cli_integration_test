@@ -4,24 +4,25 @@ use fs_extra::file::read_to_string;
 use fs_extra::file::write_all;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::fs::{set_permissions, OpenOptions, Permissions};
+use std::io;
+use std::io::Write as IoWrite;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use tempdir::TempDir;
 use walkdir::WalkDir;
-use std::os::unix::fs::PermissionsExt;
-use std::fs::{set_permissions, Permissions};
-use std::io;
 
 pub struct IntegrationTestEnvironment {
     label: String,
     tmp_dir: TempDir,
     entries: HashMap<PathBuf, Option<String>>,
-    cfg_command_callback: Box<dyn Fn(PathBuf,Command) -> Command>,
+    cfg_command_callback: Box<dyn Fn(PathBuf, Command) -> Command>,
 }
 
 impl IntegrationTestEnvironment {
     pub fn new<L>(label: L) -> Self
-        where
-            L: AsRef<str>,
+    where
+        L: AsRef<str>,
     {
         let label = label.as_ref().to_string();
         let tmp_dir = TempDir::new(&label).expect("fail to create tmp directory");
@@ -29,18 +30,21 @@ impl IntegrationTestEnvironment {
             label,
             tmp_dir,
             entries: HashMap::new(),
-            cfg_command_callback: Box::new(|_,c|c),
+            cfg_command_callback: Box::new(|_, c| c),
         }
     }
 
-    pub fn set_cfg_command_callback(&mut self, callback: impl Fn(PathBuf,Command) -> Command + 'static) {
+    pub fn set_cfg_command_callback(
+        &mut self,
+        callback: impl Fn(PathBuf, Command) -> Command + 'static,
+    ) {
         self.cfg_command_callback = Box::new(callback);
     }
 
     pub fn add_file<P, C>(&mut self, path: P, content: C)
-        where
-            P: AsRef<Path>,
-            C: AsRef<str>,
+    where
+        P: AsRef<Path>,
+        C: AsRef<str>,
     {
         self.entries.insert(
             path.as_ref().to_path_buf(),
@@ -49,16 +53,16 @@ impl IntegrationTestEnvironment {
     }
 
     pub fn read_file<P>(&self, path: P) -> String
-        where
-            P: AsRef<Path>,
+    where
+        P: AsRef<Path>,
     {
         let path = self.tmp_dir.path().join(path.as_ref());
         read_to_string(&path).expect(format!("fail to read file {:?}", path).as_str())
     }
 
     pub fn add_dir<P>(&mut self, path: P)
-        where
-            P: AsRef<Path>,
+    where
+        P: AsRef<Path>,
     {
         self.entries.insert(path.as_ref().to_path_buf(), None);
     }
@@ -79,10 +83,18 @@ impl IntegrationTestEnvironment {
         }
     }
 
-    pub fn set_exec_permission<P:AsRef<Path>>(&self,file: P) -> io::Result<()> {
+    pub fn set_exec_permission<P: AsRef<Path>>(&self, file: P) -> io::Result<()> {
         let file = self.tmp_dir.path().join(file.as_ref());
         let permissions = Permissions::from_mode(0o755);
         set_permissions(file, permissions)?;
+        Ok(())
+    }
+
+    pub fn set_update_file_time<P: AsRef<Path>>(&self, file: P) -> io::Result<()> {
+        let content = self.read_file(file.as_ref());
+        let file = self.tmp_dir.path().join(file.as_ref());
+        let mut file = OpenOptions::new().write(true).truncate(true).open(file)?;
+        write!(file, "{}", content)?;
         Ok(())
     }
 
@@ -103,12 +115,12 @@ impl IntegrationTestEnvironment {
     }
 
     pub fn command<C>(&self, crate_name: C) -> Command
-        where
-            C: AsRef<str>,
+    where
+        C: AsRef<str>,
     {
         let mut command = Command::cargo_bin(crate_name).unwrap();
         command.current_dir(&self.tmp_dir.path());
-        (self.cfg_command_callback)(self.path().clone().to_path_buf(),command)
+        (self.cfg_command_callback)(self.path().clone().to_path_buf(), command)
     }
 
     pub fn path(&self) -> &Path {
@@ -127,9 +139,9 @@ impl Display for IntegrationTestEnvironment {
 
 #[cfg(test)]
 mod test {
+    use crate::IntegrationTestEnvironment;
     use predicates::prelude::Predicate;
     use predicates::str::contains;
-    use crate::IntegrationTestEnvironment;
 
     #[test]
     fn integration_test_environment() {
@@ -146,8 +158,6 @@ mod test {
         assert!(contains("test 1").eval(e.read_file("file1").as_str()));
     }
 }
-
-
 
 #[macro_export]
 macro_rules! println_output {

@@ -13,7 +13,6 @@ use tempdir::TempDir;
 use walkdir::WalkDir;
 
 pub struct IntegrationTestEnvironment {
-    label: String,
     tmp_dir: TempDir,
     entries: HashMap<PathBuf, Option<String>>,
     cfg_command_callback: Box<dyn Fn(PathBuf, Command) -> Command>,
@@ -27,7 +26,6 @@ impl IntegrationTestEnvironment {
         let label = label.as_ref().to_string();
         let tmp_dir = TempDir::new(&label).expect("fail to create tmp directory");
         Self {
-            label,
             tmp_dir,
             entries: HashMap::new(),
             cfg_command_callback: Box::new(|_, c| c),
@@ -119,17 +117,18 @@ impl IntegrationTestEnvironment {
         tree
     }
 
-    pub fn command<C>(&self, crate_name: C) -> Command
+    pub fn command<C>(&self, crate_name: C) -> io::Result<Command>
     where
         C: AsRef<str>,
     {
         let mut command = Command::cargo_bin(crate_name).unwrap();
         command.current_dir(&self.tmp_dir.path());
-        (self.cfg_command_callback)(self.path().clone().to_path_buf(), command)
+        let command = (self.cfg_command_callback)(self.path()?.clone().to_path_buf(), command);
+        Ok(command)
     }
 
-    pub fn path(&self) -> &Path {
-        self.tmp_dir.path()
+    pub fn path(&self) -> io::Result<PathBuf> {
+        self.tmp_dir.path().canonicalize()
     }
 }
 
